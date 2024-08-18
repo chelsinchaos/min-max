@@ -59,15 +59,15 @@ Where:
 - Time Complexity: O(1) for both encoding and decoding functions
 - Space Complexity: O(1) for both encoding and decoding functions
 
-This represents a significant improvement over traditional approaches, which often have exponential time and space complexities for NP-complete problems.
+This represents a significant improvement over traditional approaches, which often have exponential time and space complexities for NP-complete decision problems.
 
 ## Usage
 
-[Include instructions on how to use the script, similar to the previous README]
+[NEED TO INCLUDE]
 
 ## Applications
 
-This approach can be applied to various NP-complete problems, including:
+This approach can be applied to various NP-complete decision problems, including:
 
 1. Traveling Salesman Problem (TSP)
 2. Knapsack Problem
@@ -76,7 +76,7 @@ This approach can be applied to various NP-complete problems, including:
 
 ## Future Work
 
-- Extend the approach to other NP-complete problems
+- Extend the approach to other NP-complete decision problems
 - Explore real-world applications in logistics, supply chain optimization, and network design
 - Investigate integration with quantum computing
 - Develop dedicated hardware to enhance performance
@@ -100,4 +100,4 @@ This approach can be applied to various NP-complete problems, including:
 
 ## Acknowledgments
 
-I wish to express my profound gratitude to the luminaries in the field of com- putational complexity theory, whose seminal works have laid the foundational stones for this research. I am immensely grateful to the vibrant and ever-curious community of researchers and scholars for fostering a milieu of rigorous inquiry and the relentless pursuit of knowledge. I also cannot have begun this this without the unrelenting support of my dad, Michael Aden McElveen, my mom, Janise Heitmann McElveen, , my wife Josie James Dionne and my entire family.
+I wish to express my profound gratitude to the luminaries in the field of computational complexity theory, whose seminal works have laid the foundational stones for this research. I am immensely grateful to the vibrant and ever-curious community of researchers and scholars for fostering a milieu of rigorous inquiry and the relentless pursuit of knowledge. I also cannot have begun this this without the unrelenting support of my dad, Michael Aden McElveen, my mom, Janise Heitmann McElveen, , my wife Josie James Dionne and my entire family.
