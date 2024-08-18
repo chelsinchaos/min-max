@@ -63,7 +63,117 @@ This represents a significant improvement over traditional approaches, which oft
 
 ## Usage
 
-[NEED TO INCLUDE]
+# Set Generation and Reverse Engineering Scripts
+
+This repository contains two Python scripts and a c++ 17 .cpp file for each the min and max versions as well as one optimized with assembly for x86: one for generating a set of permutations and another for reverse engineering encoded values. Both scripts can be run from the command line and allow for customizable input parameters.
+
+# Speedy.py
+
+## Usage
+
+Run the `speedy.py` script from the command line using the following format:
+
+`python speedy.py -n <total_elements> -k <elements_in_permutation> [-csv <csv_file_path>] [values...]`
+
+## Arguments
+
+- **`-n:`** (Required) The total number of elements.  
+  **Type:** `int`  
+  **Example:** `-n 2`
+
+- **`-k:`** (Required) The number of elements in the permutation.  
+  **Type:** `int`  
+  **Example:** `-k 16`
+
+- **`-csv:`** (Optional) Path to the CSV file with values to use instead of generating them.  
+  **Type:** `str`  
+  **Example:** `-csv path/to/file.csv`
+
+- **`values:`** (Optional) List of values to process if not provided in a CSV file.  
+  **Type:** `int` (multiple values allowed)  
+  **Example:** `1 2 3 4`
+
+## Examples
+
+### Basic Example with CSV File
+
+`python speedy.py -n 2 -k 16 -csv test_set.csv`
+
+This example processes values from the `test_set.csv` file.
+
+## Output
+
+The script processes the input values based on the provided parameters and prints the smallest value along with the total execution time in nanoseconds.
+
+# Speedy_max.cpp, Speedy_min.cpp, Speedy_x86.cpp
+
+## Compilation
+
+### Install a C++ Compiler
+
+Ensure you have a C++ compiler installed. Common options include GCC (for Linux and macOS) or MSVC (for Windows). On Linux or macOS, you can install GCC using a package manager (apt, yum, brew, etc.). On Windows, you can install Visual Studio with the C++ development tools.
+
+### Compile the program
+
+Open your terminal or command prompt.
+
+Navigate to the directory where your program.cpp file is saved.
+
+Use the following command to compile your program: g++ -o program program.cpp
+
+### Run the Executable
+
+After the compilation is successful, run the program by typing the following command: ./program -n <total_elements> -k <elements_in_permutation> -csv <csv_file_path>
+
+## Usage
+
+After compiling the program, you can run the executable from the command line using the following format:
+
+`./program -n <total_elements> -k <elements_in_permutation> -csv <csv_file_path>`
+
+### Arguments
+
+- **`-n:`** (Required) The total number of elements.  
+  **Type:** `int`  
+  **Example:** `-n 100`
+
+- **`-k:`** (Required) The number of elements in the permutation.  
+  **Type:** `int`  
+  **Example:** `-k 5`
+
+- **`-csv:`** (Optional) Path to the CSV file containing values to process.  
+  **Type:** `string`  
+  **Example:** `-csv path/to/values.csv`
+
+### Example
+
+To execute the program with 100 total elements, 5 elements in the permutation, and a CSV file named `data.csv`:
+
+`./program -n 100 -k 5 -csv data.csv`
+
+This command will process the values provided in the `data.csv` file, find the smallest value, reverse-engineer it, and display the result along with the total execution time in nanoseconds.
+
+### Output
+
+The program will output the smallest value from the provided data along with the total execution time measured in nanoseconds.
+
+
+
+## Set Generation Script
+
+### Features
+
+- Generates permutations for a given base `n` and exponent `k`.
+- Randomizes the order of the generated permutations.
+- Saves the randomized set to a CSV file (`test_set.csv`).
+
+### Usage
+
+Run the set generation script from the command line using the following format:
+
+
+python3 gen.py -n <base_number> -k <exponent>
+
 
 ## Applications
 

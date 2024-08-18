@@ -1,5 +1,6 @@
 import csv
 import random
+import argparse
 
 def generate_permutations(n, k):
     return list(range(1, n**k + 1))
@@ -22,6 +23,13 @@ def main(n, k):
     print(f"File saved with {len(values)} values in 'test_set.csv'")
 
 if __name__ == "__main__":
-    n = 2  # Set your value for n
-    k = 16  # Set your value for k
-    main(n, k)
+    # Setup argument parser
+    parser = argparse.ArgumentParser(description='Generate a set of permutations and save them to a CSV file.')
+    parser.add_argument('-n', type=int, required=True, help='The base number n')
+    parser.add_argument('-k', type=int, required=True, help='The exponent k')
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Call main function with provided arguments
+    main(args.n, args.k)
