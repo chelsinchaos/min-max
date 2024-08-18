@@ -1,0 +1,103 @@
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include <chrono>
+#include <fstream>
+#include <algorithm>
+#include <sstream>
+#include "cxxopts.hpp"
+
+double encode(double Y, int D) {
+    return pow(2, D) * (Y + D / 2.0);
+}
+
+double decode(double X, int D) {
+    return X / pow(2, D) - D / 2.0;
+}
+
+std::vector<int> ithPermutation(int n, int k, int i) {
+    std::vector<int> result;
+    int factor = 1;
+
+    for (int j = 1; j <= k; ++j) {
+        factor *= j;
+        int element = (i / factor) % (j + 1);
+        result.push_back(element);
+    }
+
+    return result;
+}
+
+std::vector<int> reverse_engineer_encoded_value(int value, int layer_depth, int n, int k, std::vector<double>& timings, std::vector<int>& sizes) {
+    if (layer_depth == 0) {
+        return ithPermutation(n, k, value);
+    }
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    double decoded_value = decode(value, 1);
+    int original_value = static_cast<int>(decoded_value - layer_depth / 2.0);  // Change '-' to '+' to find largest
+    auto result = reverse_engineer_encoded_value(original_value, layer_depth - 1, n, k, timings, sizes);
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::nano> duration = end_time - start_time;
+
+    timings.push_back(duration.count());
+    sizes.push_back(sizeof(result));
+
+    return result;
+}
+
+std::vector<int> load_values_from_csv(const std::string& csv_file_path) {
+    std::vector<int> values;
+    std::ifstream file(csv_file_path);
+    std::string line;
+
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        int value;
+        ss >> value;
+        values.push_back(value);
+    }
+
+    return values;
+}
+
+int main(int argc, char* argv[]) {
+    cxxopts::Options options("Program", "Description of Program");
+
+    // Define options
+    options.add_options()
+        ("n", "Total number of elements", cxxopts::value<int>())
+        ("k", "Number of elements in the permutation", cxxopts::value<int>())
+        ("csv", "Path to the CSV file", cxxopts::value<std::string>())
+        ("help", "Print help");
+
+    auto result = options.parse(argc, argv);
+
+    if (result.count("help")) {
+        std::cout << options.help() << std::endl;
+        return 0;
+    }
+
+    int n = result["n"].as<int>();
+    int k = result["k"].as<int>();
+    std::string csv_file_path = result["csv"].as<std::string>();
+
+    std::vector<int> values = load_values_from_csv(csv_file_path);
+    int l = static_cast<int>(std::ceil(k * std::log2(n)));
+    std::vector<double> timings;
+    std::vector<int> sizes;
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+    auto largest_value = *std::max_element(values.begin(), values.end());  // Change min_element to max_element
+    reverse_engineer_encoded_value(largest_value, l, n, k, timings, sizes);
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double, std::nano> total_time = end_time - start_time;
+
+    std::cout << largest_value << std::endl;  // Print the largest value
+    std::cout << total_time.count() << " ns" << std::endl;
+
+    return 0;
+}
