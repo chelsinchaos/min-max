@@ -157,8 +157,6 @@ This command will process the values provided in the `data.csv` file, find the s
 
 The program will output the smallest value from the provided data along with the total execution time measured in nanoseconds.
 
-
-
 ## Set Generation Script
 
 ### Features
