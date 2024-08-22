@@ -1,21 +1,8 @@
-# Copyright 2024 Chelsea Anne McElveen
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
-
-
-
 import argparse
 import math
 import random
-import time
-import sys
 import csv
+import time
 
 def encode(Y, D):
     return 2**D * (Y + D/2)
@@ -24,69 +11,69 @@ def decode(X, D):
     return X/(2**D) - D/2
 
 def ithPermutation(n, k, i):
-    result = 0
-    factor = 1
-    for j in range(1, k + 1):
-        factor *= j
-        element = i // factor % (j + 1)
-        result += element * 10 ** (j - 1)  # Assuming base 10
-    return result
+    elements = list(range(n))
+    perm = []
+    for _ in range(k):
+        if not elements:
+            break
+        index = i % len(elements)
+        perm.append(elements.pop(index))
+        if not elements:  # Protect against zero division.
+            break
+        i //= len(elements)
+    return ''.join(map(str, perm))
 
-def reverse_engineer_encoded_value(value, layer_depth, n, k, timings, sizes):
+def reverse_engineer_encoded_value(value, layer_depth, n, k):
     if layer_depth == 0:
         return ithPermutation(n, k, value)
 
-    start_time = time.perf_counter()
+    smallest_value = ((((k * math.log2(n) - layer_depth) + 1) / (2**(((k * math.log2(n) - layer_depth) + 1) - 1)))/2) - (((k * math.log2(n) - layer_depth) + 1) / 2)
 
-    decoded_value = decode(value, 1)
-    original_value = decoded_value - layer_depth/2
-    result = reverse_engineer_encoded_value(original_value, layer_depth - 1, n, k, timings, sizes)
+    if smallest_value < value:
+        value -= smallest_value
 
-    end_time = time.perf_counter()
-    timings[layer_depth] = (end_time - start_time)  # nanoseconds
-    sizes[layer_depth] = sys.getsizeof(result)
+    return reverse_engineer_encoded_value(int(smallest_value), layer_depth - 1, n, k)
 
-    return result
-
-def load_values_from_csv(csv_file_path):
-    with open(csv_file_path, newline='') as csvfile:
-        return [int(row[0]) for row in csv.reader(csvfile)]
+def read_values_from_csv(csv_file):
+    values = []
+    with open(csv_file, mode='r') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            values.extend([int(val) for val in row])
+    return values
 
 def main(args):
     n = args.n
     k = args.k
-    values_at_D0 = load_values_from_csv(args.csv) if args.csv else args.values
+    generate_random_values = True if args.p == "T" else False
 
-    l = math.ceil(k * math.log2(n))
-    timings = {}
-    sizes = {}
+    l = int(k * math.log2(n))
 
-    # Reverse engineer each value
-    reverse_engineered_values = [
-        reverse_engineer_encoded_value(value, l, n, k, timings, sizes)
-        for value in values_at_D0
-    ]
+    if args.csv:
+        values_at_D0 = read_values_from_csv(args.csv)
+    elif generate_random_values:
+        values_at_D0 = [random.randint(1, 100) for _ in range(n**k)]
+    else:
+        values_at_D0 = args.values
 
-    # Find the smallest reverse-engineered value
-    smallest_value = min(reverse_engineered_values)
-
+    encoded_value_at_max_D = sum(values_at_D0)
+    
+    # High-resolution nanosecond timing
     start_time = time.perf_counter_ns()
-    reverse_engineer_encoded_value(smallest_value, l, n, k, timings, sizes)
+    smallest_value = reverse_engineer_encoded_value(encoded_value_at_max_D, l, n, k)
     end_time = time.perf_counter_ns()
 
-    total_time = (end_time - start_time)
+    time_taken_ns = end_time - start_time
 
-    print(f"Smallest value: {smallest_value}")
-    print(f"Total time: {total_time:.6f} ns")
-
-    return smallest_value
+    print(f"The smallest value at depth 0 is: {smallest_value}")
+    print(f"Time taken to calculate smallest value: {time_taken_ns} nanoseconds")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process the input parameters.')
     parser.add_argument('-n', type=int, required=True, help='The total number of elements.')
     parser.add_argument('-k', type=int, required=True, help='Number of elements in the permutation.')
-    parser.add_argument('-csv', type=str, help='Path to the CSV file with values to use instead of generating them.')
-    parser.add_argument('values', nargs='*', type=int, help='List of values if not provided in a CSV file.')
-    args = parser.parse_args()
+    parser.add_argument('-p', choices=['T', 'F'], required=True, help='Generate random values or use provided values.')
+    parser.add_argument('-csv', type=str, help='Path to a CSV file containing input values.')
 
+    args = parser.parse_args()
     main(args)
