@@ -61,7 +61,14 @@ def main(args):
     timings = {}
     sizes = {}
 
-    smallest_value = min(values_at_D0)
+    # Reverse engineer each value
+    reverse_engineered_values = [
+        reverse_engineer_encoded_value(value, l, n, k, timings, sizes)
+        for value in values_at_D0
+    ]
+
+    # Find the smallest reverse-engineered value
+    smallest_value = min(reverse_engineered_values)
 
     start_time = time.perf_counter_ns()
     reverse_engineer_encoded_value(smallest_value, l, n, k, timings, sizes)
@@ -69,8 +76,8 @@ def main(args):
 
     total_time = (end_time - start_time)
 
-    print(f"{smallest_value}")  # smallest value
-    print(f"{total_time:.6f} ns")  # total execution time
+    print(f"Smallest value: {smallest_value}")
+    print(f"Total time: {total_time:.6f} ns")
 
     return smallest_value
 
