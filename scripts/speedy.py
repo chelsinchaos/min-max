@@ -74,21 +74,23 @@ def main(args):
     timings = {}
     sizes = {}
 
-    start_time = time.perf_counter()
+    start_time = time.perf_counter_ns()
     smallest_value = reverse_engineer_encoded_value(sum(values_at_D0), l, n, k, timings, sizes)
-    end_time = time.perf_counter()
+    end_time = time.perf_counter_ns()
 
     index_of_value = values_at_D0.index(smallest_value)
     total_time = (end_time - start_time) * 1e6
     total_size = sys.getsizeof(values_at_D0) + sum(sizes.values())
+    total_search_timing = sum(timings.values())
 
     print(f"The smallest value at depth 0 is: {smallest_value}")
     print(f"Index of smallest value in original set: {index_of_value}")
     print(f"Number of steps/layers: {l}")
-    print(f"Total processing time: {total_time:.6f} microseconds")
+    print(f"Total processing time: {total_time:.9f} nanoseconds")
     print(f"Total memory used: {total_size} bytes")
+    print(f"Total Search Timing: {total_search_timing:.9f} nanoseconds")
     for depth, timing in timings.items():
-        print(f"Time taken for layer {depth}: {timing:.6f} microseconds")
+        print(f"Time taken for layer {depth}: {timing:.9f} nanoseconds")
         print(f"Memory used for layer {depth}: {sizes[depth]} bytes")
 
 if __name__ == "__main__":

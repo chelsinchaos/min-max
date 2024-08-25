@@ -22,7 +22,7 @@ def find_min_value_in_single_column_csv(file_path):
 
 if __name__ == "__main__":
     # Replace with your actual file path
-    file_path = 'tests/test_set.csv'
+    file_path = 'original_permutations.csv'
     
     min_index, min_value, duration_ns = find_min_value_in_single_column_csv(file_path)
     print(f"The smallest value is {min_value} at index {min_index}.")
