@@ -706,10 +706,12 @@ class FlatFileDatabase:
         self._log_operation('compact_shard', f'Shard {shard_number} compacted.')
 
     def encode(self, Y, D):
-        return 2**D * (Y + D/2)
+        """Encode a value using an arbitrary-precision approach to avoid overflow."""
+        return (Y * (2**D)) + (2**(D-1))
 
     def decode(self, X, D):
-        return X/(2**D) - D/2
+        """Decode the value using an arbitrary-precision approach."""
+        return (X - (2**(D-1))) // (2**D)
 
     def ith_permutation(self, n, k, i):
         elements = list(range(n))
@@ -729,24 +731,18 @@ class FlatFileDatabase:
         if layer_depth == 0:
             return self.ith_permutation(n, k, value)
 
-        start_time = time.perf_counter()
-
         # Decoding the value for the current layer
         decoded_value = self.decode(value, 1)
-        
+
         # Adjust comparison based on the desired target_index
         comparison = target_index % 2  # Determine whether to use < or > comparison at this layer
         if comparison == 0:
-            original_value = decoded_value - layer_depth/2  # For < comparison
+            original_value = decoded_value - layer_depth // 2  # For < comparison, using integer division
         else:
-            original_value = decoded_value + layer_depth/2  # For > comparison
+            original_value = decoded_value + layer_depth // 2  # For > comparison, using integer division
 
         # Recursively call for the next layer
         result = self.reverse_engineer_encoded_value(original_value, layer_depth - 1, n, k, target_index // 2, timings, sizes)
-
-        end_time = time.perf_counter()
-        timings[layer_depth] = (end_time - start_time) * 1e6
-        sizes[layer_depth] = sys.getsizeof(result)
 
         return result
 
@@ -844,7 +840,7 @@ class FlatFileDatabase:
             k = self._calculate_k()  # Dynamically calculate k based on the database size
 
             l = math.ceil(k * math.log2(n))
-            
+
             with self.global_lock:
                 with open(self.filename, 'r', newline='') as f:
                     reader = csv.reader(f)
@@ -853,21 +849,20 @@ class FlatFileDatabase:
                     bitstring_values = []
                     bitstring_metadata = []
 
-                    # Convert each record to a bitstring
+                    # Convert each record to a bitstring and store metadata
                     for row in reader:
                         bitstring, metadata = self._convert_record_to_bitstring(row)
                         bitstring_values.append(int(bitstring, 2))
                         bitstring_metadata.append(metadata)
 
                     # Perform the reverse engineering search
-                    start_time = time.perf_counter_ns()
                     nth_value = self.reverse_engineer_encoded_value(
                         sum(bitstring_values), l, n, k, target_index, timings, sizes
                     )
-                    end_time = time.perf_counter_ns()
 
                     # Convert the found integer value back to a bitstring
-                    nth_bitstring = bin(nth_value)[2:].zfill(len(bitstring_values[0]))  # Ensure it has the correct length
+                    max_bit_length = max(len(bin(b)[2:]) for b in bitstring_values)  # Find the max bit length
+                    nth_bitstring = bin(nth_value)[2:].zfill(max_bit_length)  # Ensure it has the correct length
 
                     # Find the matching record using the bitstring
                     for idx, original_bitstring in enumerate(bitstring_values):
@@ -875,9 +870,6 @@ class FlatFileDatabase:
                             result_record = self._convert_bitstring_to_record(nth_bitstring, bitstring_metadata[idx])
                             results.append(result_record)
                             break
-
-            # Logging
-            self._log_operation('search', f"Search for {target_index+1}th encoded value performed. Time taken: {(end_time - start_time) * 1e6} nanoseconds")
 
             return results
 

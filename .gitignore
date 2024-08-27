@@ -30,6 +30,7 @@ share/python-wheels/
 MANIFEST
 
 *.csv
+*.pem
 *.log
 .DS_Store
 
