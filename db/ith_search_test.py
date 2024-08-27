@@ -50,8 +50,7 @@ def insert_dummy_data(db):
     start_time = time.time_ns()
     dummy_records = [["1", "int", "123"], ["2", "str", "test"], ["3", "float", "45.67"]]  # Sample records
     for record in dummy_records:
-        encoded_record, metadata = db._convert_record_to_bitstring(record)
-        db.insert([encoded_record, metadata])  # Store encoded record and metadata
+        db.insert(record)  # Directly store the record in its original format
     end_time = time.time_ns()
     print(f"Inserting dummy data took {end_time - start_time} ns")
 
@@ -60,8 +59,7 @@ def ith_search_function(db, index):
     result = db.search(target_index=index)  # Use the search function to retrieve a record
     
     if result:
-        encoded_record, metadata = result[0]  # Assuming the result returns a list with encoded record and metadata
-        record = db._convert_bitstring_to_record(encoded_record, metadata)  # Decode the record
+        record = result[0]  # Directly use the record returned by the search function
     else:
         record = []
 

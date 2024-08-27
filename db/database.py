@@ -728,21 +728,23 @@ class FlatFileDatabase:
         return sum(perm)
 
     def reverse_engineer_encoded_value(self, value, layer_depth, n, k, target_index, timings, sizes):
+        """Reverse engineer the encoded value, starting from the highest level down to 0."""
+
         if layer_depth == 0:
+            print(f"Base case reached at recursion level: {layer_depth}")
             return self.ith_permutation(n, k, value)
 
-        # Decoding the value for the current layer
-        decoded_value = self.decode(value, 1)
-
         # Adjust comparison based on the desired target_index
-        comparison = target_index % 2  # Determine whether to use < or > comparison at this layer
+        comparison = (target_index >> (layer_depth - 1)) % 2  # Shift right to get the bit corresponding to the current layer depth
         if comparison == 0:
-            original_value = decoded_value - layer_depth // 2  # For < comparison, using integer division
+            original_value = value - layer_depth // 2  # For < comparison
+            operator = "<"
         else:
-            original_value = decoded_value + layer_depth // 2  # For > comparison, using integer division
+            original_value = value - layer_depth // 2  # For > comparison
+            operator = ">"
 
-        # Recursively call for the next layer
-        result = self.reverse_engineer_encoded_value(original_value, layer_depth - 1, n, k, target_index // 2, timings, sizes)
+        # Recursively call for the next lower layer
+        result = self.reverse_engineer_encoded_value(original_value, layer_depth - 1, n, k, target_index, timings, sizes)
 
         return result
 
