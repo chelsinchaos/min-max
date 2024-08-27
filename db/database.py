@@ -43,6 +43,17 @@ class FlatFileDatabase:
         self.executor = ThreadPoolExecutor(max_workers=max_workers)  # Thread pool executor
         self.shard_size = shard_size  # Number of records per shard
         self.wal_filename = wal_filename  # Write-Ahead Log filename
+        self.indexes = {}  # Assuming some index structure
+        self.insertion_count = 0
+        self.deletion_count = 0
+        
+        # Additional initialization for handling data types
+        self.data_type_converters = {
+            int: int,
+            float: float,
+            str: str,
+            # Add more data types as needed
+        }
         
         # Load RSA keys from files
         self.private_key = RSA.import_key(open("private.pem").read())
@@ -694,23 +705,200 @@ class FlatFileDatabase:
         os.replace(temp_filename, shard_filename)
         self._log_operation('compact_shard', f'Shard {shard_number} compacted.')
 
-    def search(self, criteria: Callable[[List[str]], bool]) -> List[List[str]]:
-        """Searches for records that match the given criteria."""
+    def encode(self, Y, D):
+        return 2**D * (Y + D/2)
+
+    def decode(self, X, D):
+        return X/(2**D) - D/2
+
+    def ith_permutation(self, n, k, i):
+        elements = list(range(n))
+        perm = []
+        for _ in range(k):
+            if not elements:
+                break
+            index = int(i % len(elements))
+            perm.append(elements[index])
+            elements.remove(elements[index])
+            if not elements:
+                break
+            i //= len(elements)
+        return sum(perm)
+
+    def reverse_engineer_encoded_value(self, value, layer_depth, n, k, target_index, timings, sizes):
+        if layer_depth == 0:
+            return self.ith_permutation(n, k, value)
+
+        start_time = time.perf_counter()
+
+        # Decoding the value for the current layer
+        decoded_value = self.decode(value, 1)
+        
+        # Adjust comparison based on the desired target_index
+        comparison = target_index % 2  # Determine whether to use < or > comparison at this layer
+        if comparison == 0:
+            original_value = decoded_value - layer_depth/2  # For < comparison
+        else:
+            original_value = decoded_value + layer_depth/2  # For > comparison
+
+        # Recursively call for the next layer
+        result = self.reverse_engineer_encoded_value(original_value, layer_depth - 1, n, k, target_index // 2, timings, sizes)
+
+        end_time = time.perf_counter()
+        timings[layer_depth] = (end_time - start_time) * 1e6
+        sizes[layer_depth] = sys.getsizeof(result)
+
+        return result
+
+    def _convert_record_to_bitstring(self, record: List[str]) -> Tuple[str, Dict]:
+        """Convert a database record to a bitstring and store metadata for reverse conversion."""
+        bitstring = ""
+        metadata = {}
+
+        for i, value in enumerate(record):
+            if isinstance(value, int):
+                binary = bin(value)[2:]  # Convert to binary and remove the '0b' prefix
+                bitstring += binary
+                metadata[i] = ("int", len(binary))  # Store type and length
+            elif isinstance(value, float):
+                binary = ''.join(format(c, '08b') for c in bytearray(struct.pack("f", value)))
+                bitstring += binary
+                metadata[i] = ("float", len(binary))
+            elif isinstance(value, str):
+                binary = ''.join(format(ord(c), '08b') for c in value)
+                bitstring += binary
+                metadata[i] = ("str", len(binary))
+            # Add more types if necessary
+
+        return bitstring, metadata
+
+    def _convert_bitstring_to_record(self, bitstring: str, metadata: Dict) -> List[str]:
+        """Convert a bitstring back to a database record using stored metadata."""
+        record = []
+        current_position = 0
+
+        for i in range(len(metadata)):
+            data_type, length = metadata[i]
+            binary_segment = bitstring[current_position:current_position + length]
+            if data_type == "int":
+                value = int(binary_segment, 2)
+            elif data_type == "float":
+                value = struct.unpack("f", bytearray(int(binary_segment[i:i+8], 2) for i in range(0, length, 8)))[0]
+            elif data_type == "str":
+                value = ''.join(chr(int(binary_segment[i:i+8], 2)) for i in range(0, length, 8))
+            record.append(value)
+            current_position += length
+
+        return record
+
+    def _calculate_k(self) -> int:
+        """Calculate the value of k based on the current number of items in the database."""
+        total_items = self.insertion_count - self.deletion_count
+        if total_items <= 0:
+            raise ValueError("The database must have at least one item.")
+        return math.ceil(math.log2(total_items))
+
+    def insert(self, record: List[str]):
+        """Insert a new record into the database."""
+        try:
+            with self.global_lock:
+                with open(self.filename, 'a', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(record)
+                    self.insertion_count += 1
+                    self._log_operation('insert', f"Record inserted. Total records: {self.insertion_count - self.deletion_count}")
+        except Exception as e:
+            self._handle_error(f"Error inserting record: {str(e)}")
+            raise
+
+    def delete(self, criteria: Callable[[List[str]], bool]):
+        """Delete records from the database based on a criteria function."""
+        try:
+            with self.global_lock:
+                temp_filename = self.filename + '.tmp'
+                with open(self.filename, 'r', newline='') as f, open(temp_filename, 'w', newline='') as temp_f:
+                    reader = csv.reader(f)
+                    writer = csv.writer(temp_f)
+                    deleted_count = 0
+                    for row in reader:
+                        if not criteria(row):
+                            writer.writerow(row)
+                        else:
+                            deleted_count += 1
+                            self.deletion_count += 1
+                    os.replace(temp_filename, self.filename)
+                self._log_operation('delete', f"Deleted {deleted_count} records. Total records: {self.insertion_count - self.deletion_count}")
+        except Exception as e:
+            self._handle_error(f"Error deleting records: {str(e)}")
+            raise
+
+    def search(self, target_index: int = 0, generate_random_values: bool = True) -> List[List[str]]:
+        """Searches for the nth encoded value in the database using the reverse engineering technique."""
         try:
             self._check_permission('read')
             results = []
-            with self.lock:
+            timings = {}
+            sizes = {}
+
+            n = 2  # Fixed value as per the requirement
+            k = self._calculate_k()  # Dynamically calculate k based on the database size
+
+            l = math.ceil(k * math.log2(n))
+            
+            with self.global_lock:
                 with open(self.filename, 'r', newline='') as f:
                     reader = csv.reader(f)
                     next(reader)  # Skip header
+
+                    bitstring_values = []
+                    bitstring_metadata = []
+
+                    # Convert each record to a bitstring
                     for row in reader:
-                        if criteria(row):
-                            results.append(row)
-            self._log_operation('search', 'Criteria search performed')
+                        bitstring, metadata = self._convert_record_to_bitstring(row)
+                        bitstring_values.append(int(bitstring, 2))
+                        bitstring_metadata.append(metadata)
+
+                    # Perform the reverse engineering search
+                    start_time = time.perf_counter_ns()
+                    nth_value = self.reverse_engineer_encoded_value(
+                        sum(bitstring_values), l, n, k, target_index, timings, sizes
+                    )
+                    end_time = time.perf_counter_ns()
+
+                    # Convert the found integer value back to a bitstring
+                    nth_bitstring = bin(nth_value)[2:].zfill(len(bitstring_values[0]))  # Ensure it has the correct length
+
+                    # Find the matching record using the bitstring
+                    for idx, original_bitstring in enumerate(bitstring_values):
+                        if original_bitstring == nth_value:
+                            result_record = self._convert_bitstring_to_record(nth_bitstring, bitstring_metadata[idx])
+                            results.append(result_record)
+                            break
+
+            # Logging
+            self._log_operation('search', f"Search for {target_index+1}th encoded value performed. Time taken: {(end_time - start_time) * 1e6} nanoseconds")
+
             return results
+
         except Exception as e:
             self._handle_error(f"Error searching records: {str(e)}")
             raise
+
+    # Logging operation for consistency
+    def _log_operation(self, operation: str, message: str):
+        with open(self.log_filename, 'a', newline='') as log_file:
+            writer = csv.writer(log_file)
+            writer.writerow([datetime.now(), operation, message])
+
+    # Permission check stub
+    def _check_permission(self, operation: str):
+        # Implement permission checking as needed
+        pass
+
+    # Error handling stub
+    def _handle_error(self, message: str):
+        print(message)
 
     def list_records(self) -> List[List[str]]:
         """Lists all records in the database."""
